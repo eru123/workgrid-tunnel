@@ -7,7 +7,8 @@ Latest entries first. Keep entries short and factual.
 - Resolved the prior `ws.next().await` borrow-check issue in `crates/workgrid-relay/src/server.rs` by reading the peer control message directly from the same owned `WebSocketStream` instead of trying to split a borrowed stream.
 - Removed dead `PairGuard`/`PendingEntry` scaffolding and the `run_checks` stub that was introduced in the blocked implementation attempt. Added a small `verify_pair` helper using `Registry::verify_signature`.
 - Confirmed `cargo check --workspace` compiles cleanly after the change and pushed to `origin/main` as `4729504`.
-- Doc blocker remains for full task 3 verification: on this Windows host the relay end-to-end harness still lacks a viable local WebSocket test path because the full-disk MSYS `git-bash` environment here does not provide `nohup`, and task 37 explicitly requires verification against the real `skiddph` server; without SSH credentials I cannot execute that harness here. No fabricated verification output was added.
+- Implemented relay pairing + byte forwarding in `crates/workgrid-relay/src/server.rs`: replaced the pre-pairing auth-payload path with a server_id-keyed pending map so the second inbound `PairRequest` completes pairing with the waiting first peer, validates `server_id` consistency, emits `PairAck` to both sides after registry verification, then forwards bytes bidirectionally on the established WebSocket streams. Verified with `cargo check --workspace`; tasks 4 and 5 checkboxes updated in `docs/plan/tasks.md`.
+- Doc blocker remains for full task 37 verification
 
 - Ran `npx repopact init` in `~/workgrid-tunnel` to generate the RepoPact contract files.
 - Copied handoff docs into `docs/plan/specs.md`, `docs/plan/design.md`, and `docs/plan/tasks.md`.

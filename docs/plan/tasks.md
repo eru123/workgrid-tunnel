@@ -1,8 +1,8 @@
 - [x] Set up Cargo workspace with crates workgrid-protocol, workgrid-relay, workgrid-daemon, workgrid-cli
 - [x] Define relay control-plane message types in workgrid-protocol (register, pair-request, pair-ack)
 - [x] Implement relay: accept WebSocket connections, verify signatures against registry
-- [ ] Implement relay: pair inbound daemon and client connections by server_id
-- [ ] Implement relay: bidirectional byte forwarding between paired connections
+- [x] Implement relay: pair inbound daemon and client connections by server_id
+- [x] Implement relay: bidirectional byte forwarding between paired connections
 - [ ] Add relay registry persistence (server_id -> public key) with add/revoke operations
 - [ ] Write a runnable check that pairs two dummy WebSocket clients through the relay and confirms bytes flow both ways
 - [ ] Add russh as a dependency to workgrid-daemon and bind an SSH server to a WebSocket stream instead of a TCP socket

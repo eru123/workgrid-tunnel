@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
@@ -9,12 +10,14 @@ use crate::registry::Registry;
 
 pub struct Relay {
     pub registry: Registry,
+    pending: Arc<tokio::sync::Mutex<HashMap<String, tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>>>>,
 }
 
 impl Relay {
     pub fn new() -> Self {
         Self {
             registry: Registry::new(),
+            pending: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }
     }
 }
@@ -74,34 +77,46 @@ async fn handle_connection(
         }
 
         ControlMessage::PairRequest { .. } => {
-            let auth = match read_next(&mut ws).await? {
-                Message::Text(text) => text,
-                _ => anyhow::bail!("missing auth payload"),
-            };
-            let parts: Vec<&str> = auth.splitn(2, ':').collect();
-            if parts.len() != 2 || parts[0] != server_id {
-                anyhow::bail!("auth payload malformed");
+            let mut pending = relay.pending.lock().await;
+
+            let peer_exists = pending.contains_key(&server_id);
+            if peer_exists {
+                let mut peer_ws = pending.remove(&server_id).unwrap();
+                drop(pending);
+
+                let peer_msg_text = match read_next(&mut peer_ws).await? {
+                    Message::Text(text) => text,
+                    _ => anyhow::bail!("missing peer control message"),
+                };
+                let peer_msg: ControlMessage = serde_json::from_str(&peer_msg_text)?;
+                let peer_id = match peer_msg.server_id() {
+                    Some(id) => id.clone(),
+                    None => anyhow::bail!("missing peer server_id"),
+                };
+
+                if peer_id != server_id {
+                    anyhow::bail!("peer server_id mismatch");
+                }
+
+                if !verify_pair(&relay.registry, &server_id, &peer_id).await {
+                    anyhow::bail!("signature mismatch");
+                }
+
+                ws.send(Message::Text(
+                    serde_json::to_string(&ControlMessage::pair_ack(peer_id.clone()))?,
+                ))
+                .await?;
+                peer_ws
+                    .send(Message::Text(
+                        serde_json::to_string(&ControlMessage::pair_ack(server_id.clone()))?,
+                    ))
+                    .await?;
+
+                tracing::info!(server_id=%server_id, peer_id=%peer_id, "paired");
+            } else {
+                pending.insert(server_id.clone(), ws);
+                tracing::info!(server_id=%server_id, "waiting for peer");
             }
-
-            let peer_msg_text = match read_next(&mut ws).await? {
-                Message::Text(text) => text,
-                _ => anyhow::bail!("missing peer control message"),
-            };
-            let peer_msg: ControlMessage = serde_json::from_str(&peer_msg_text)?;
-            let peer_id = match peer_msg.server_id() {
-                Some(id) => id,
-                None => anyhow::bail!("missing peer server_id"),
-            };
-
-            if !verify_pair(&relay.registry, &server_id, parts[1], peer_id, parts[1]).await {
-                anyhow::bail!("signature mismatch");
-            }
-
-            ws.send(Message::Text(
-                serde_json::to_string(&ControlMessage::pair_ack(peer_id.clone()))?,
-            ))
-            .await?;
-            tracing::info!(server_id=%server_id, peer_id=%peer_id, "paired");
         }
 
         ControlMessage::PairAck { .. } => {
@@ -115,11 +130,8 @@ async fn handle_connection(
 async fn verify_pair(
     registry: &Registry,
     server_id: &str,
-    server_pub: &str,
     peer_id: &str,
-    peer_pub: &str,
 ) -> bool {
-    let a_ok = registry.verify_signature(server_id, server_pub).await;
-    let b_ok = registry.verify_signature(peer_id, peer_pub).await;
-    a_ok && b_ok
+    registry.verify_signature(server_id, server_id).await
+        && registry.verify_signature(peer_id, peer_id).await
 }
