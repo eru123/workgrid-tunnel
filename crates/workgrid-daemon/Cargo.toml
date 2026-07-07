@@ -15,4 +15,4 @@ base64.workspace = true
 anyhow = "1"
 workgrid-protocol = { path = "../workgrid-protocol" }
 serde_json = "1.0"
-rand_core = { version = "0.6", default-features = false }
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
