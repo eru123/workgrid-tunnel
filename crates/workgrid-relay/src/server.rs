@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::RwLock;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use workgrid_protocol::message::ControlMessage;
@@ -52,10 +51,27 @@ async fn handle_connection(
             Some(id) => id.clone(),
             None => anyhow::bail!("missing server_id"),
         };
-        let has_entry = relay.registry.verify_signature(&server_id, "").await;
-        if !has_entry {
-            anyhow::bail!("unregistered server_id: {}", server_id);
+
+        match msg {
+            ControlMessage::Register { public_key, .. } => {
+                relay.registry.add(&server_id, &public_key).await;
+            }
+            ControlMessage::PairRequest { .. } | ControlMessage::PairAck { .. } => {
+                let pending = ws.next().await;
+                let auth = match pending {
+                    Some(Ok(Message::Text(payload))) => payload,
+                    _ => anyhow::bail!("missing auth payload"),
+                };
+                let parts: Vec<&str> = auth.splitn(2, ':').collect();
+                if parts.len() != 2 || parts[0] != server_id {
+                    anyhow::bail!("auth payload malformed");
+                }
+                if !relay.registry.verify_signature(parts[0], parts[1]).await {
+                    anyhow::bail!("signature mismatch");
+                }
+            }
         }
+
         tracing::info!("accepted control message for server_id={}", server_id);
     }
     Ok(())
