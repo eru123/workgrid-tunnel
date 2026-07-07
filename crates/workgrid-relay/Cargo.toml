@@ -1,0 +1,20 @@
+[package]
+name = "workgrid-relay"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+authors.workspace = true
+repository = "https://github.com/eru123/workgrid-tunnel"
+
+[dependencies]
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+ed25519-dalek.workspace = true
+base64.workspace = true
+workgrid-protocol = { path = "../workgrid-protocol" }
+anyhow = "1"
+serde_json = "1"
+tracing = "0.1"
+futures-util = { workspace = true }

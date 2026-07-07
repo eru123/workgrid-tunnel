@@ -1,0 +1,14 @@
+[package]
+name = "workgrid-protocol"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+authors.workspace = true
+repository = "https://github.com/eru123/workgrid-tunnel"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ed25519-dalek.workspace = true
+base64.workspace = true

@@ -1,5 +1,5 @@
-- [ ] Set up Cargo workspace with crates workgrid-protocol, workgrid-relay, workgrid-daemon, workgrid-cli
-- [ ] Define relay control-plane message types in workgrid-protocol (register, pair-request, pair-ack)
+- [x] Set up Cargo workspace with crates workgrid-protocol, workgrid-relay, workgrid-daemon, workgrid-cli
+- [x] Define relay control-plane message types in workgrid-protocol (register, pair-request, pair-ack)
 - [ ] Implement relay: accept WebSocket connections, verify signatures against registry
 - [ ] Implement relay: pair inbound daemon and client connections by server_id
 - [ ] Implement relay: bidirectional byte forwarding between paired connections

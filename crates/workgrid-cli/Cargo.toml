@@ -1,0 +1,19 @@
+[package]
+name = "workgrid-cli"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+authors.workspace = true
+repository = "https://github.com/eru123/workgrid-tunnel"
+
+[[bin]]
+name = "workgrid"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+ed25519-dalek.workspace = true
+base64.workspace = true
+workgrid-protocol = { path = "../workgrid-protocol" }
