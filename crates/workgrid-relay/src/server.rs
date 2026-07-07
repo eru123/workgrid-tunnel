@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use workgrid_protocol::message::ControlMessage;
 
 use crate::registry::Registry;
@@ -61,6 +61,13 @@ async fn handle_connection(
 
     match msg {
         ControlMessage::Register { public_key, .. } => {
+            if !relay
+                .registry
+                .check_signing(&server_id, &public_key)
+                .await
+            {
+                anyhow::bail!("registering key failed verification");
+            }
             relay.registry.add(&server_id, &public_key).await;
             tracing::info!(server_id=%server_id, "registered");
             return Ok(());
@@ -89,6 +96,11 @@ async fn handle_connection(
             if !verify_pair(&relay.registry, &server_id, parts[1], peer_id, parts[1]).await {
                 anyhow::bail!("signature mismatch");
             }
+
+            ws.send(Message::Text(
+                serde_json::to_string(&ControlMessage::pair_ack(peer_id.clone()))?,
+            ))
+            .await?;
             tracing::info!(server_id=%server_id, peer_id=%peer_id, "paired");
         }
 

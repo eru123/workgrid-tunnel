@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use ed25519_dalek::PUBLIC_KEY_LENGTH;
+
 #[derive(Default, Clone)]
 pub struct Registry {
     inner: Arc<RwLock<HashMap<String, String>>>,
@@ -29,6 +31,13 @@ impl Registry {
         match registry.get(server_id) {
             Some(expected) => expected == public_key,
             None => false,
+        }
+    }
+
+    pub async fn check_signing(&self, _server_id: &str, public_key: &str) -> bool {
+        match base64::decode(public_key) {
+            Ok(bytes) => bytes.len() == PUBLIC_KEY_LENGTH,
+            Err(_) => false,
         }
     }
 }
