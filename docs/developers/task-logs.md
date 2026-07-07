@@ -2,6 +2,8 @@
 
 Latest entries first. Keep entries short and factual.
 
+- Added relay registry persistence to `crates/workgrid-relay/src/registry.rs`: `Registry` now accepts an optional `save_path`, reloads from disk via `load_from`, and persists after every add/revoke. Added runnable verification in `crates/workgrid-relay/tests/registry.rs` covering add/revoke behavior and load-from disk revival. Verified with `cargo test -p workgrid-relay`; task 6 checkbox updated in `docs/plan/tasks.md`.
+
 - Updated `crates/workgrid-relay/src/server.rs` to verify registering public keys via `Registry::check_signing` before accepting them, and to send a `PairAck` control message on successful pairing. Added `Registry::check_signing` in `crates/workgrid-relay/src/registry.rs` to ensure submitted public keys decode to Ed25519 public-key length. Verified with `cargo check --workspace`; task 3 checkbox updated in `docs/plan/tasks.md`.
 
 - Resolved the prior `ws.next().await` borrow-check issue in `crates/workgrid-relay/src/server.rs` by reading the peer control message directly from the same owned `WebSocketStream` instead of trying to split a borrowed stream.
