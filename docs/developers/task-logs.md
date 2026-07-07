@@ -6,6 +6,8 @@ Latest entries first. Keep entries short and factual.
 
 - `git push origin main` blocks in this cron session: `ssh: connect to host github.com port 22: Connection timed out`. Commit `b9a7d18` exists locally; retry push from a session/network with outbound GitHub SSH access.
 
+- `git push origin main` still blocks as of commit `bda1303`: `Failed to connect to github.com port 443 after 21107 ms: Could not connect to server`. Commit exists locally; retry push from a session/network with outbound GitHub HTTPS access.
+
 - Added runnable relay-bidirectional test in `crates/workgrid-relay/tests/pairing.rs`: spins up the relay, registers two dummy clients under the same `server_id`, sends paired `PairRequest`s, drains control `pair_ack`s, then verifies binary messages flow both ways. Verified with `cargo test -p workgrid-relay`; task 7 checkbox updated in `docs/plan/tasks.md`.
 
 - Updated `crates/workgrid-relay/src/server.rs` to verify registering public keys via `Registry::check_signing` before accepting them, and to send a `PairAck` control message on successful pairing. Added `Registry::check_signing` in `crates/workgrid-relay/src/registry.rs` to ensure submitted public keys decode to Ed25519 public-key length. Verified with `cargo check --workspace`; task 3 checkbox updated in `docs/plan/tasks.md`.
