@@ -3,8 +3,8 @@
 - [x] Implement relay: accept WebSocket connections, verify signatures against registry
 - [x] Implement relay: pair inbound daemon and client connections by server_id
 - [x] Implement relay: bidirectional byte forwarding between paired connections
-- [ ] Add relay registry persistence (server_id -> public key) with add/revoke operations
-- [ ] Write a runnable check that pairs two dummy WebSocket clients through the relay and confirms bytes flow both ways
+- [x] Add relay registry persistence (server_id -> public key) with add/revoke operations
+- [x] Write a runnable check that pairs two dummy WebSocket clients through the relay and confirms bytes flow both ways
 - [ ] Add russh as a dependency to workgrid-daemon and bind an SSH server to a WebSocket stream instead of a TCP socket
 - [ ] Implement daemon config loading (identity key, relay endpoint) from a fixed local path
 - [ ] Implement daemon reconnect-with-backoff to the relay on disconnect

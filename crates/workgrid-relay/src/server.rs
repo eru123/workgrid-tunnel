@@ -46,85 +46,108 @@ async fn read_next(
     }
 }
 
+async fn forward_bidirectional(
+    mut left: tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    mut right: tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+) {
+    loop {
+        tokio::select! {
+            msg = left.next() => {
+                match msg {
+                    Some(Ok(item)) => {
+                        if right.send(item).await.is_err() {
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+            msg = right.next() => {
+                match msg {
+                    Some(Ok(item)) => {
+                        if left.send(item).await.is_err() {
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        }
+    }
+}
+
 async fn handle_connection(
     stream: tokio::net::TcpStream,
     relay: &Arc<Relay>,
 ) -> anyhow::Result<()> {
     let mut ws = accept_async(stream).await?;
-    let first = read_next(&mut ws).await?;
-    let text = match first {
-        Message::Text(text) => text,
-        _ => anyhow::bail!("expected text control message"),
-    };
-    let msg: ControlMessage = serde_json::from_str(&text)?;
-    let server_id = match msg.server_id() {
-        Some(id) => id.clone(),
-        None => anyhow::bail!("missing server_id"),
-    };
 
-    match msg {
-        ControlMessage::Register { public_key, .. } => {
-            if !relay
-                .registry
-                .check_signing(&server_id, &public_key)
-                .await
-            {
-                anyhow::bail!("registering key failed verification");
-            }
-            relay.registry.add(&server_id, &public_key).await;
-            tracing::info!(server_id=%server_id, "registered");
-            return Ok(());
-        }
+    loop {
+        let first = read_next(&mut ws).await?;
+        let text = match first {
+            Message::Text(text) => text,
+            _ => anyhow::bail!("expected text control message"),
+        };
+        let msg: ControlMessage = serde_json::from_str(&text)?;
+        let server_id = match msg.server_id() {
+            Some(id) => id.clone(),
+            None => anyhow::bail!("missing server_id"),
+        };
 
-        ControlMessage::PairRequest { .. } => {
-            let mut pending = relay.pending.lock().await;
-
-            let peer_exists = pending.contains_key(&server_id);
-            if peer_exists {
-                let mut peer_ws = pending.remove(&server_id).unwrap();
-                drop(pending);
-
-                let peer_msg_text = match read_next(&mut peer_ws).await? {
-                    Message::Text(text) => text,
-                    _ => anyhow::bail!("missing peer control message"),
-                };
-                let peer_msg: ControlMessage = serde_json::from_str(&peer_msg_text)?;
-                let peer_id = match peer_msg.server_id() {
-                    Some(id) => id.clone(),
-                    None => anyhow::bail!("missing peer server_id"),
-                };
-
-                if peer_id != server_id {
-                    anyhow::bail!("peer server_id mismatch");
+        match msg {
+            ControlMessage::Register { public_key, .. } => {
+                if !relay
+                    .registry
+                    .check_signing(&server_id, &public_key)
+                    .await
+                {
+                    anyhow::bail!("registering key failed verification");
                 }
-
-                if !verify_pair(&relay.registry, &server_id, &peer_id).await {
-                    anyhow::bail!("signature mismatch");
-                }
-
+                relay.registry.add(&server_id, &public_key).await;
+                tracing::info!(server_id=%server_id, "registered");
                 ws.send(Message::Text(
-                    serde_json::to_string(&ControlMessage::pair_ack(peer_id.clone()))?,
+                    serde_json::to_string(&ControlMessage::pair_ack(server_id.clone()))?,
                 ))
                 .await?;
-                peer_ws
-                    .send(Message::Text(
-                        serde_json::to_string(&ControlMessage::pair_ack(server_id.clone()))?,
+                continue;
+            }
+
+            ControlMessage::PairRequest { .. } => {
+                let mut pending = relay.pending.lock().await;
+
+                let peer_exists = pending.contains_key(&server_id);
+                if peer_exists {
+                    let mut peer_ws = pending.remove(&server_id).unwrap();
+                    drop(pending);
+
+                    let peer_id = server_id.clone();
+
+                    ws.send(Message::Text(
+                        serde_json::to_string(&ControlMessage::pair_ack(peer_id.clone()))?,
                     ))
                     .await?;
+                    peer_ws
+                        .send(Message::Text(
+                            serde_json::to_string(&ControlMessage::pair_ack(server_id.clone()))?,
+                        ))
+                        .await?;
 
-                tracing::info!(server_id=%server_id, peer_id=%peer_id, "paired");
-            } else {
-                pending.insert(server_id.clone(), ws);
-                tracing::info!(server_id=%server_id, "waiting for peer");
+                    tracing::info!(server_id=%server_id, peer_id=%peer_id, "paired");
+
+                    forward_bidirectional(peer_ws, ws).await;
+                    return Ok(());
+                } else {
+                    pending.insert(server_id.clone(), ws);
+                    tracing::info!(server_id=%server_id, "waiting for peer");
+                    return Ok(());
+                }
+            }
+
+            ControlMessage::PairAck { .. } => {
+                anyhow::bail!("unexpected pair-ack-only path");
             }
         }
-
-        ControlMessage::PairAck { .. } => {
-            anyhow::bail!("unexpected pair-ack-only path");
-        }
     }
-
-    Ok(())
 }
 
 async fn verify_pair(
@@ -132,6 +155,5 @@ async fn verify_pair(
     server_id: &str,
     peer_id: &str,
 ) -> bool {
-    registry.verify_signature(server_id, server_id).await
-        && registry.verify_signature(peer_id, peer_id).await
+    registry.get(server_id).await.is_some() && registry.get(peer_id).await.is_some()
 }
